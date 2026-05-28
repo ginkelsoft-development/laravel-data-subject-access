@@ -1,0 +1,77 @@
+{
+  "name": "ginkelsoft/laravel-data-subject-access",
+  "description": "A Laravel package that implements GDPR art. 15 / 20 subject-access (inzageverzoek) exports across configured Eloquent models, in JSON or Markdown, with a tamper-evident access log.",
+  "keywords": [
+    "laravel",
+    "gdpr",
+    "avg",
+    "subject-access",
+    "right-of-access",
+    "inzageverzoek",
+    "data-portability",
+    "compliance",
+    "audit-log",
+    "ginkelsoft"
+  ],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Wietse van Ginkel",
+      "email": "info@ginkelsoft.com",
+      "homepage": "https://ginkelsoft.com",
+      "role": "Developer"
+    }
+  ],
+  "require": {
+    "php": "^8.2",
+    "illuminate/support": "^10.0 || ^11.0 || ^12.0 || ^13.0",
+    "illuminate/database": "^10.0 || ^11.0 || ^12.0 || ^13.0",
+    "illuminate/console": "^10.0 || ^11.0 || ^12.0 || ^13.0",
+    "nesbot/carbon": "^2.62 || ^3.0",
+    "ginkelsoft/laravel-compliance-core": "dev-development"
+  },
+  "require-dev": {
+    "orchestra/testbench": "^8.0 || ^9.0 || ^10.0 || ^11.0",
+    "pestphp/pest": "^2.30 || ^3.0",
+    "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0",
+    "phpstan/phpstan": "^1.10 || ^2.0",
+    "laravel/pint": "^1.18"
+  },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../laravel-compliance-core",
+      "options": {"symlink": true}
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Ginkelsoft\\DataSubjectAccess\\": "src/",
+      "Ginkelsoft\\DataSubjectAccess\\Database\\Factories\\": "database/factories/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Ginkelsoft\\DataSubjectAccess\\Tests\\": "tests/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Ginkelsoft\\DataSubjectAccess\\DataSubjectAccessServiceProvider"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "vendor/bin/pest",
+    "analyse": "vendor/bin/phpstan analyse",
+    "format": "vendor/bin/pint"
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
