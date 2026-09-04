@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Ginkelsoft\DataSubjectAccess\Concerns;
 
+use Ginkelsoft\ComplianceCore\Concerns\HasSubjectQuery;
+use Ginkelsoft\ComplianceCore\Contracts\ResolvesSubjectColumn;
 use Ginkelsoft\DataSubjectAccess\Actions\CollectSubjectData;
 use Ginkelsoft\DataSubjectAccess\Support\ExportableConfig;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 
 /**
  * Trait Exportable
@@ -21,13 +23,21 @@ use Illuminate\Database\Eloquent\Model;
  * (subject column) and a protected `$exportable` array property
  * (fields list, labels, optional transforms).
  *
- * Models that also use {@see Forgettable} only need one
- * implementation of `forSubjectQuery` — the signature matches.
+ * `forSubjectQuery` itself is no longer declared here: it is inherited
+ * from {@see HasSubjectQuery} (compliance-core), which builds it as
+ * `WHERE {subjectColumn()} = :subject`. This trait only has to satisfy
+ * {@see ResolvesSubjectColumn}. Models that also use `Forgettable` (from
+ * `laravel-data-right-to-be-forgotten`, once it composes the same base
+ * trait) no longer need an `insteadof` — both traits resolve
+ * `forSubjectQuery` to the exact same `HasSubjectQuery` source, so PHP
+ * never sees a collision.
  *
  * @mixin Model
  */
 trait Exportable
 {
+    use HasSubjectQuery;
+
     /**
      * Resolve the export policy for this model.
      *
@@ -39,28 +49,31 @@ trait Exportable
     }
 
     /**
-     * Build the query that selects every record of this model belonging
-     * to the given subject.
+     * The column {@see HasSubjectQuery} filters on for `forSubjectQuery`.
      *
-     * Override on the model when the link is more complex than
-     * `column = subject` (multi-column, polymorphic, joined, etc).
+     * Deliberate, explicit behaviour for a model that uses this trait but
+     * never declared an `Exportable` policy (no `#[Exportable]` attribute,
+     * no `$exportable` property): this now throws instead of silently
+     * matching zero rows. `CollectSubjectData` already skips such models
+     * before ever calling `forSubjectQuery`, via its own policy-null
+     * check, so in practice this only guards a direct/manual call — and a
+     * clear failure beats a silent, misleadingly-empty export for a
+     * misconfigured model.
      *
-     * @return Builder<static>
+     * @throws InvalidArgumentException When no policy is declared.
      */
-    public static function forSubjectQuery(string $subject): Builder
+    public static function subjectColumn(): string
     {
-        /** @var Builder<static> $query */
-        $query = static::query();
-
         $policy = ExportableConfig::for(static::class);
 
         if ($policy === null) {
-            $query = $query->whereRaw('1=0');
-        } else {
-            $query = $query->where($policy->column, '=', $subject);
+            throw new InvalidArgumentException(
+                'Cannot build forSubjectQuery() for '.static::class.': no Exportable '
+                .'policy is declared. Add the #[Exportable] attribute and/or a protected '
+                .'$exportable property, or override forSubjectQuery() directly.'
+            );
         }
 
-        /** @var Builder<static> $query */
-        return $query;
+        return $policy->column;
     }
 }
