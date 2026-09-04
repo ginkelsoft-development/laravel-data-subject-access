@@ -87,7 +87,51 @@ class Profile extends Model implements ExportableContract
 }
 ```
 
-### 2. Register the models
+### 2. Combine with right-to-be-forgotten (optional)
+
+`Exportable` and `Forgettable` (`laravel-data-right-to-be-forgotten`) both
+build their `forSubjectQuery()` from the shared `HasSubjectQuery` base trait
+in `ginkelsoft/laravel-compliance-core`. That trait resolves the subject
+column through the model's own `ResolvesSubjectColumn` implementation, so a
+model can use both traits directly — no `insteadof` conflict resolution
+needed:
+
+```php
+use Ginkelsoft\DataRightToBeForgotten\Attributes\Forgettable as ForgettablePolicy;
+use Ginkelsoft\DataRightToBeForgotten\Concerns\Forgettable;
+use Ginkelsoft\DataRightToBeForgotten\Contracts\Forgettable as ForgettableContract;
+use Ginkelsoft\DataSubjectAccess\Attributes\Exportable as ExportablePolicy;
+use Ginkelsoft\DataSubjectAccess\Concerns\Exportable;
+use Ginkelsoft\DataSubjectAccess\Contracts\Exportable as ExportableContract;
+
+#[ExportablePolicy(column: 'id')]
+#[ForgettablePolicy(column: 'id', action: 'delete')]
+class User extends Model implements ExportableContract, ForgettableContract
+{
+    use Exportable, Forgettable;
+
+    protected array $exportable = [
+        'fields' => [
+            'id'    => 'Subject identifier',
+            'email' => 'E-mailadres',
+        ],
+    ];
+}
+```
+
+Each package keeps its own config: `Exportable` reads `ExportableConfig` —
+set above via the `#[ExportablePolicy]` attribute (subject column) plus the
+`$exportable` property (the exported field list). `Forgettable` reads
+`ForgettableConfig` — set here via the `#[ForgettablePolicy]` attribute
+(`column` and `action`); a `$forgettable` property is also available when a
+model needs per-field anonymize strategies instead of a hard delete, see the
+[`laravel-data-right-to-be-forgotten` README](https://github.com/ginkelsoft-development/laravel-data-right-to-be-forgotten#how-it-works).
+Both configs point at the same `id` column here, so `forSubjectQuery` — built
+once, in the shared `HasSubjectQuery` trait — just works for both. When the
+columns differ (e.g. a polymorphic model like `ForgetTicket`), override
+`forSubjectQuery` on the model to combine both — see the Gotchas section.
+
+### 3. Register the models
 
 ```php
 // config/subject-access.php
@@ -100,7 +144,7 @@ return [
 ];
 ```
 
-### 3. Run the export
+### 4. Run the export
 
 ```bash
 php artisan retention:export 01HXYZ
@@ -116,7 +160,7 @@ default; the `Ginkelsoft\DataSubjectAccess\Contracts\Exporter` interface
 lets you add more (HTML, CSV, PDF) without touching the rest of the
 package.
 
-### 4. Verify the access chain
+### 5. Verify the access chain
 
 ```php
 use Ginkelsoft\ComplianceCore\Config\LogSecret;
@@ -184,22 +228,14 @@ COMPLIANCE_LOG_SECRET="$(openssl rand -base64 32)"
 - **The export is a snapshot.** Records created or modified after the
   export are obviously not in it. If the subject asks for a fresh export
   tomorrow, run it again — accountability comes from the per-call log row.
-- **Trait conflict with right-to-be-forgotten.** A model that carries both
-  `Exportable` (this package) and `Forgettable` (`laravel-data-right-to-be-forgotten`)
-  must resolve the `forSubjectQuery` conflict explicitly:
-  ```php
-  use Ginkelsoft\DataRightToBeForgotten\Concerns\Forgettable;
-  use Ginkelsoft\DataSubjectAccess\Concerns\Exportable;
-  class User extends Model implements ExportableContract, ForgettableContract
-  {
-      use Exportable, Forgettable {
-          Forgettable::forSubjectQuery insteadof Exportable;
-      }
-  }
-  ```
-  When both policies use the same subject column (the common case), either
-  `insteadof` picks works. When the columns differ, override
-  `forSubjectQuery` on the model directly instead.
+- **Combining with right-to-be-forgotten, different columns.** When a model
+  uses both `Exportable` and `Forgettable` and the two policies point at
+  *different* subject columns (e.g. a polymorphic model like `ForgetTicket`
+  linked via `subject_id` for one policy and `owner_id` for the other),
+  override `forSubjectQuery` on the model to `OR` both columns together. The
+  common case — same column for both policies — needs no override at all;
+  see [Combine with right-to-be-forgotten](#2-combine-with-right-to-be-forgotten-optional)
+  above.
 - **PDF is intentionally not built-in.** Adding a PDF generator would pull
   in a heavy dependency for what is essentially an Exporter contract that
   you can implement in a project-specific way (Dompdf, mPDF, Browsershot).
