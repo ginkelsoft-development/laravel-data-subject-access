@@ -97,11 +97,15 @@ model can use both traits directly — no `insteadof` conflict resolution
 needed:
 
 ```php
+use Ginkelsoft\DataRightToBeForgotten\Attributes\Forgettable as ForgettablePolicy;
 use Ginkelsoft\DataRightToBeForgotten\Concerns\Forgettable;
 use Ginkelsoft\DataRightToBeForgotten\Contracts\Forgettable as ForgettableContract;
+use Ginkelsoft\DataSubjectAccess\Attributes\Exportable as ExportablePolicy;
 use Ginkelsoft\DataSubjectAccess\Concerns\Exportable;
 use Ginkelsoft\DataSubjectAccess\Contracts\Exportable as ExportableContract;
 
+#[ExportablePolicy(column: 'id')]
+#[ForgettablePolicy(column: 'id', action: 'delete')]
 class User extends Model implements ExportableContract, ForgettableContract
 {
     use Exportable, Forgettable;
@@ -115,9 +119,16 @@ class User extends Model implements ExportableContract, ForgettableContract
 }
 ```
 
-Both policies read the subject column from their own config (`ExportableConfig`
-and `ForgettableConfig`); when they agree, `forSubjectQuery` just works. When
-the columns differ (e.g. a polymorphic model like `ForgetTicket`), override
+Each package keeps its own config: `Exportable` reads `ExportableConfig` —
+set above via the `#[ExportablePolicy]` attribute (subject column) plus the
+`$exportable` property (the exported field list). `Forgettable` reads
+`ForgettableConfig` — set here via the `#[ForgettablePolicy]` attribute
+(`column` and `action`); a `$forgettable` property is also available when a
+model needs per-field anonymize strategies instead of a hard delete, see the
+[`laravel-data-right-to-be-forgotten` README](https://github.com/ginkelsoft-development/laravel-data-right-to-be-forgotten#how-it-works).
+Both configs point at the same `id` column here, so `forSubjectQuery` — built
+once, in the shared `HasSubjectQuery` trait — just works for both. When the
+columns differ (e.g. a polymorphic model like `ForgetTicket`), override
 `forSubjectQuery` on the model to combine both — see the Gotchas section.
 
 ### 3. Register the models
